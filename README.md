@@ -46,6 +46,124 @@ then `npm start`
 
 then `docker-compose up database backend && npm start`
 
+## Runtime plugins
+
+Open Hospital UI can load frontend plugins at runtime. The current plugin
+runtime is intentionally small and is based on extension points exposed by the
+main application.
+
+At application startup, and again after a successful login, the UI calls the
+authenticated plugin discovery endpoint:
+
+```
+GET /plugins
+Authorization: Bearer <token>
+```
+
+The discovery response is expected to contain plugin descriptors. Supported
+descriptor fields include:
+
+```json
+{
+  "pluginId": "org.openhospital.plugin.example",
+  "remoteEntry": "/plugins/org.openhospital.plugin.example/frontend/remoteEntry.js",
+  "globalName": "example",
+  "exposedModule": "./Banner",
+  "status": "ACTIVE",
+  "enabled": true
+}
+```
+
+If `remoteEntry` is not provided, the UI falls back to:
+
+```
+/plugins/{pluginId}/frontend/remoteEntry.js
+```
+
+Only active plugins are loaded. A plugin is skipped when `enabled` is `false`,
+or when `status` is present and different from `ACTIVE`.
+
+The runtime supports:
+
+- native ESM remote imports;
+- authenticated fetch plus blob import fallback;
+- classic Webpack Module Federation remotes exposed on `window[globalName]`.
+
+Webpack remotes should use `output.publicPath = "auto"` so additional chunks are
+loaded from the same location as `remoteEntry.js`.
+
+### Current extension point
+
+The first supported extension point is:
+
+```
+header.banner
+```
+
+It is rendered by `HeaderBannerSlot` inside the application header. Banner
+contributions are ordered by severity, priority, and plugin/id. Dismissible
+banners are remembered in `sessionStorage`.
+
+A plugin can expose a banner using the default `./Banner` module:
+
+```tsx
+export default function Banner({ isPrimary, onDismiss }) {
+  return (
+    <div>
+      Plugin banner
+      {onDismiss && <button onClick={onDismiss}>Dismiss</button>}
+    </div>
+  );
+}
+```
+
+The loader also supports a richer runtime plugin shape:
+
+```tsx
+export const extensions = {
+  'header.banner': [
+    {
+      id: 'example-banner',
+      pluginId: 'org.openhospital.plugin.example',
+      severity: 'info',
+      priority: 10,
+      dismissible: true,
+      render: ({ isPrimary, onDismiss }) => (
+        <div>
+          Plugin banner
+          {onDismiss && <button onClick={onDismiss}>Dismiss</button>}
+        </div>
+      ),
+    },
+  ],
+};
+```
+
+The recommended place to scaffold frontend plugins is the
+[Open Hospital plugin SDK][openhospital-plugin-sdk].
+
+### Possible future extension points
+
+The plugin runtime can be expanded with additional stable UI slots. The most
+useful candidates are:
+
+- `app.navigation.main`: add plugin entries to the main navigation.
+- `app.routes`: register plugin-owned application routes.
+- `patient.summary.cards`: add cards to the patient summary/details view.
+- `patient.actions`: add patient-scoped actions such as audit, export, or
+  external integrations.
+- `dashboard.widgets`: add dashboard widgets.
+- `admin.settings.sections`: add plugin configuration sections to the admin
+  area.
+- `toolbar.global.actions`: add global toolbar actions.
+- `data-export.providers`: add export formats or export destinations.
+- `patient.tabs`: add full patient detail tabs for larger plugin workflows.
+- `form.field.extensions`: add field-level decorators or validation hooks.
+
+The first expansion should probably focus on routes, navigation, patient
+summary/actions, dashboard widgets, and admin settings. That gives plugins
+enough surface to provide complete workflows while keeping the UI contract small.
+
 ## How to build
 
     npm run build:prod
@@ -147,6 +265,7 @@ our [Slack workspace][slack] or by subscribing to our [mailing list][ml].
 [openhospital-core]: https://github.com/informatici/openhospital-core
 [openhospital-api]: https://github.com/informatici/openhospital-api
 [openhospital-gui]: https://github.com/informatici/openhospital-gui
+[openhospital-plugin-sdk]: https://github.com/mwithi/openhospital-plugin-sdk
 [contribution-guide]: https://openhospital.atlassian.net/wiki/display/OH/Contribution+Guidelines
 [jira]: https://openhospital.atlassian.net/secure/RapidBoard.jspa?rapidView=5&selectedIssue=OP-293
 [slack]: https://join.slack.com/t/openhospitalworkspace/shared_invite/enQtOTc1Nzc0MzE2NjQ0LWIyMzRlZTU5NmNlMjE2MDcwM2FhMjRkNmM4YzI0MTAzYTA0YTI3NjZiOTVhMDZlNWUwNWEzMjE5ZDgzNWQ1YzE
