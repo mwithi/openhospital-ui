@@ -15,6 +15,7 @@ import { PATHS } from '../../../consts';
 import type { HospitalDTO } from '../../../generated';
 import { useShowHelp } from '../../../libraries/hooks/useShowHelp';
 import { usePermission } from '../../../libraries/permissionUtils/usePermission';
+import { HeaderBannerSlot } from '../../../plugins/headerBanner/HeaderBannerSlot';
 import { getHospital } from '../../../state/hospital';
 import { setLogout } from '../../../state/main';
 import type { IState } from '../../../types';
@@ -89,6 +90,7 @@ const AppHeader: FunctionComponent<IOwnProps> = ({ breadcrumbMap }) => {
 					)}
 				</div>
 			</div>
+			<HeaderBannerSlot />
 			<div className="appHeader__bottom">
 				<div className="appHeader__background">
 					<div className="appHeader__identifier">

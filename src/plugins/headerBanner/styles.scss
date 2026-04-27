@@ -1,0 +1,29 @@
+.headerBannerSlot {
+  width: 100%;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.headerBannerSlot__primary {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 8px 30px;
+}
+
+.headerBannerSlot__content {
+  min-width: 0;
+  flex: 1;
+}
+
+.headerBannerSlot__toggle {
+  flex: 0 0 auto;
+  min-width: 40px;
+  color: #444;
+}
+
+.headerBannerSlot__list {
+  display: grid;
+  gap: 8px;
+  padding: 0 30px 8px;
+}

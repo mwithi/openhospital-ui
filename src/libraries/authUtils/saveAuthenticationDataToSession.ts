@@ -1,6 +1,9 @@
 import { AUTH_KEY } from '../../consts';
 import type { LoginResponse } from '../../generated/models/LoginResponse';
+import { loadRemotePlugins } from '../../plugins';
 import { SessionStorage } from '../storage/storage';
 
-export const saveAuthenticationDataToSession = (payload: LoginResponse) =>
+export const saveAuthenticationDataToSession = (payload: LoginResponse) => {
 	SessionStorage.write(AUTH_KEY, payload);
+	loadRemotePlugins();
+};

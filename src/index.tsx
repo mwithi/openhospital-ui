@@ -4,12 +4,14 @@ import { Provider } from 'react-redux';
 import App from './App';
 import './index.css';
 import { enableMocking } from './mocks';
+import { loadRemotePlugins } from './plugins';
 import * as serviceWorker from './serviceWorker';
 import { store } from './state/store';
 
 const container = document.getElementById('root');
 const root = createRoot(container as Container);
-enableMocking().then(() => {
+enableMocking().then(async () => {
+	await loadRemotePlugins();
 	root.render(
 		<React.StrictMode>
 			<Provider store={store}>
