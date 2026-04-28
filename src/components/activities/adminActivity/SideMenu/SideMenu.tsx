@@ -3,6 +3,7 @@ import {
 	ArrowForwardIosRounded,
 	AssignmentInd,
 	BlurCircular,
+	Extension,
 	GroupWork,
 	Healing,
 	LocalDrink,
@@ -63,6 +64,10 @@ const SideMenu = () => {
 		{
 			key: 'users',
 			icon: <People fontSize="small" />,
+		},
+		{
+			key: 'plugins',
+			icon: <Extension fontSize="small" />,
 		},
 		{
 			key: 'types',

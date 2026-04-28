@@ -54,6 +54,28 @@ export const getExtensions = <T extends ExtensionPointName>(
 	return [...(extensions.get(point) ?? [])] as Contribution<T>[];
 };
 
+export const unregisterPluginExtensions = (pluginId: string) => {
+	let removedExtensions = 0;
+
+	for (const [point, pointExtensions] of extensions.entries()) {
+		const nextExtensions = pointExtensions.filter((extension) => {
+			const shouldKeep = extension.pluginId !== pluginId;
+			if (!shouldKeep) {
+				removedExtensions += 1;
+			}
+			return shouldKeep;
+		});
+
+		extensions.set(point, nextExtensions);
+	}
+
+	if (removedExtensions > 0) {
+		notifyListeners();
+	}
+
+	return removedExtensions;
+};
+
 export const useExtensions = <T extends ExtensionPointName>(
 	point: T,
 ): Contribution<T>[] => {

@@ -30,6 +30,7 @@ export const PATHS = {
 	admin_usergroups_new: '/admin/users/groups/new',
 	admin_usergroups_edit: '/admin/users/groups/edit/:id',
 	admin_users_edit: '/admin/users/:id/edit',
+	admin_plugins: '/admin/plugins',
 	admin_vaccines: '/admin/vaccines',
 	admin_vaccines_new: '/admin/vaccines/new',
 	admin_vaccines_edit: '/admin/vaccines/:code/edit',

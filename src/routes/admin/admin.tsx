@@ -178,6 +178,13 @@ export const ADMIN_ROUTES: RouteObject[] = [
 			})),
 	},
 	{
+		path: getPath(PATHS.admin_plugins),
+		lazy: async () =>
+			import('../../components/accessories/admin/plugins').then((module) => ({
+				Component: module.Plugins,
+			})),
+	},
+	{
 		path: getPath(PATHS.admin_types),
 		lazy: async () =>
 			import('./types').then((module) => ({

@@ -8,7 +8,10 @@ import type {
 	ExtensionPointName,
 	HeaderBannerContribution,
 } from './extensionPoints';
-import { registerExtension } from './extensionRegistry';
+import {
+	registerExtension,
+	unregisterPluginExtensions,
+} from './extensionRegistry';
 
 export interface PluginDescriptor {
 	id?: string;
@@ -67,9 +70,11 @@ const createShareScope = () => ({
 	},
 });
 
+const shareScope = createShareScope();
 const pluginsEndpoint = '/plugins';
 const loadedPluginIds = new Set<string>();
 const loadingPluginIds = new Set<string>();
+const initializedRemoteContainers = new WeakSet<WebpackRemoteContainer>();
 
 const getPluginId = (plugin: PluginDescriptor) => plugin.id ?? plugin.pluginId;
 
@@ -277,7 +282,11 @@ const loadWebpackRemoteModule = async (
 		throw new Error(`Webpack remote container ${globalName} was not found`);
 	}
 
-	await container.init?.(createShareScope());
+	if (!initializedRemoteContainers.has(container)) {
+		await container.init?.(shareScope);
+		initializedRemoteContainers.add(container);
+	}
+
 	const moduleFactory = await container.get(
 		getPluginExposedModule(pluginDescriptor),
 	);
@@ -358,6 +367,10 @@ const loadPlugin = async (pluginDescriptor: PluginDescriptor) => {
 	}
 };
 
+export const loadRemotePlugin = async (pluginDescriptor: PluginDescriptor) => {
+	await loadPlugin(pluginDescriptor);
+};
+
 export const loadRemotePlugins = async () => {
 	if (!hasAuthenticationToken()) {
 		logPluginDebug('Skipping plugin discovery: no authentication token');
@@ -380,4 +393,20 @@ export const loadRemotePlugins = async () => {
 	} catch (error) {
 		console.warn('Plugin discovery failed', error);
 	}
+};
+
+export const unloadRemotePlugin = (pluginId: string) => {
+	loadingPluginIds.delete(pluginId);
+	loadedPluginIds.delete(pluginId);
+	return unregisterPluginExtensions(pluginId);
+};
+
+export const reloadRemotePlugins = async () => {
+	for (const pluginId of loadedPluginIds) {
+		unregisterPluginExtensions(pluginId);
+	}
+
+	loadedPluginIds.clear();
+	loadingPluginIds.clear();
+	await loadRemotePlugins();
 };
