@@ -25,22 +25,26 @@ import {
 } from 'react';
 import ConfirmationDialog from '~/components/accessories/confirmationDialog/ConfirmationDialog';
 import { AdminActivityContent } from '~/components/activities/adminActivity';
+import { useAppDispatch, useAppSelector } from '~/libraries/hooks/redux';
 import { loadRemotePlugin, unloadRemotePlugin } from '~/plugins';
+import {
+	approveInstalledPlugin,
+	disableInstalledPlugin,
+	enableInstalledPlugin,
+	getPlugins,
+	installPluginZip,
+	pluginActionsReset,
+	uninstallInstalledPlugin,
+} from '~/state/plugins';
 import warningIcon from '../../../../assets/warning-icon.png';
 import classes from './Plugins.module.scss';
 import {
-	approvePlugin,
-	disablePlugin,
-	enablePlugin,
 	getPluginId,
 	getPluginManifest,
 	getPluginName,
 	type InstalledPlugin,
-	installPlugin,
-	listPlugins,
 	type PluginFieldPermissionDescriptor,
 	type PluginManifest,
-	uninstallPlugin,
 } from './pluginAdminApi';
 
 const statusColor: Record<
@@ -136,22 +140,46 @@ const getManifestField = (
 const statusLabel = (plugin: InstalledPlugin) =>
 	plugin.status ?? (plugin.enabled ? 'ACTIVE' : 'DISABLED');
 
-const upsertPlugin = (
-	plugins: InstalledPlugin[],
-	updatedPlugin: InstalledPlugin,
-) => {
-	const updatedPluginId = getPluginId(updatedPlugin);
-	const exists = plugins.some(
-		(plugin) => getPluginId(plugin) === updatedPluginId,
-	);
+const getApiErrorMessage = (error: unknown) => {
+	const response = (error as { response?: unknown })?.response ?? error;
 
-	if (!exists) {
-		return [updatedPlugin, ...plugins];
+	if (typeof response === 'string') {
+		return response;
 	}
 
-	return plugins.map((plugin) =>
-		getPluginId(plugin) === updatedPluginId ? updatedPlugin : plugin,
-	);
+	if (response && typeof response === 'object') {
+		const apiError = response as {
+			message?: string;
+			detail?: string;
+			error?: string;
+			details?: Array<{ message?: string; field?: string }>;
+		};
+
+		if (apiError.message) {
+			return apiError.message;
+		}
+
+		if (apiError.detail) {
+			return apiError.detail;
+		}
+
+		if (apiError.details?.length) {
+			return apiError.details
+				.map((detail) =>
+					detail.field && detail.message
+						? `${detail.field}: ${detail.message}`
+						: detail.message,
+				)
+				.filter(Boolean)
+				.join('\n');
+		}
+
+		if (apiError.error) {
+			return apiError.error;
+		}
+	}
+
+	return (error as Error).message;
 };
 
 const SummaryItem = ({ label, value }: { label: string; value: number }) => (
@@ -177,18 +205,29 @@ const DetailField = ({
 );
 
 export const Plugins = () => {
-	const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
+	const dispatch = useAppDispatch();
+	const pluginStore = useAppSelector((state) => state.plugins);
 	const [pluginManifests, setPluginManifests] = useState<
 		Record<string, PluginManifest>
 	>({});
 	const [selectedPluginId, setSelectedPluginId] = useState<string>();
-	const [isLoading, setIsLoading] = useState(false);
 	const [isManifestLoading, setIsManifestLoading] = useState(false);
 	const [busyAction, setBusyAction] = useState<string>();
 	const [error, setError] = useState<string>();
 	const [pendingConfirmation, setPendingConfirmation] =
 		useState<PendingPluginConfirmation>();
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const plugins = pluginStore.pluginList.data ?? [];
+	const isLoading = pluginStore.pluginList.isLoading;
+	const apiError =
+		pluginStore.pluginList.error ??
+		pluginStore.install.error ??
+		pluginStore.approve.error ??
+		pluginStore.enable.error ??
+		pluginStore.disable.error ??
+		pluginStore.uninstall.error;
+	const errorMessage =
+		error ?? (apiError ? getApiErrorMessage(apiError) : undefined);
 
 	const selectedPluginBase = plugins.find(
 		(plugin) => getPluginId(plugin) === selectedPluginId,
@@ -221,22 +260,19 @@ export const Plugins = () => {
 	);
 
 	const loadPlugins = useCallback(async () => {
-		setIsLoading(true);
 		setError(undefined);
+		dispatch(pluginActionsReset());
 		try {
-			const loadedPlugins = await listPlugins();
-			setPlugins(loadedPlugins);
+			const loadedPlugins = await dispatch(getPlugins()).unwrap();
 			setSelectedPluginId(
 				(current) =>
 					current ??
 					(loadedPlugins[0] ? getPluginId(loadedPlugins[0]) : undefined),
 			);
-		} catch (loadError) {
-			setError((loadError as Error).message);
-		} finally {
-			setIsLoading(false);
+		} catch {
+			// The rejected payload is stored in the plugins slice.
 		}
-	}, []);
+	}, [dispatch]);
 
 	useEffect(() => {
 		loadPlugins();
@@ -261,7 +297,7 @@ export const Plugins = () => {
 			})
 			.catch((manifestError) => {
 				if (isMounted) {
-					setError((manifestError as Error).message);
+					setError(getApiErrorMessage(manifestError));
 				}
 			})
 			.finally(() => {
@@ -281,42 +317,26 @@ export const Plugins = () => {
 	) => {
 		setBusyAction(label);
 		setError(undefined);
+		dispatch(pluginActionsReset());
 		try {
 			const updatedPlugin = await action();
 			if (updatedPlugin) {
 				const updatedPluginId = getPluginId(updatedPlugin);
 				const previousManifest = pluginManifests[updatedPluginId];
-				const previousPlugin = plugins.find(
-					(plugin) => getPluginId(plugin) === updatedPluginId,
-				);
-				const updatedPluginWithManifest = {
-					...previousManifest,
-					...updatedPlugin,
-					status: updatedPlugin.status ?? previousPlugin?.status,
-					enabled: updatedPlugin.enabled ?? previousPlugin?.enabled,
-					approved: updatedPlugin.approved ?? previousPlugin?.approved,
-					manifest: {
-						...updatedPlugin.manifest,
-						...previousManifest,
-					},
-				} as InstalledPlugin;
-
-				setPlugins((current) =>
-					upsertPlugin(current, updatedPluginWithManifest),
-				);
 				setPluginManifests((current) => ({
 					...current,
 					[updatedPluginId]:
 						current[updatedPluginId] ??
 						updatedPlugin.manifest ??
-						updatedPluginWithManifest,
+						previousManifest ??
+						{},
 				}));
 				setSelectedPluginId(updatedPluginId);
 			} else {
 				await loadPlugins();
 			}
 		} catch (actionError) {
-			setError((actionError as Error).message);
+			setError(getApiErrorMessage(actionError));
 		} finally {
 			setBusyAction(undefined);
 		}
@@ -330,7 +350,9 @@ export const Plugins = () => {
 			return;
 		}
 
-		await runPluginAction('install', () => installPlugin(file));
+		await runPluginAction('install', () =>
+			dispatch(installPluginZip(file)).unwrap(),
+		);
 	};
 
 	const requestPluginAction = (
@@ -346,64 +368,50 @@ export const Plugins = () => {
 
 	const handleApprove = (pluginId: string) =>
 		runPluginAction('approve', async () => {
-			const plugin = await approvePlugin(pluginId);
+			const plugin = await dispatch(approveInstalledPlugin(pluginId)).unwrap();
 			await loadRemotePlugin({
 				...plugin,
 				pluginId,
 				status: 'ACTIVE',
 				enabled: true,
 			});
-			return {
-				...plugin,
-				pluginId,
-				status: 'ACTIVE',
-				enabled: true,
-				approved: true,
-			};
+			return plugin;
 		});
 
 	const handleEnable = (pluginId: string) =>
 		runPluginAction('enable', async () => {
-			const plugin = await enablePlugin(pluginId);
+			const plugin = await dispatch(enableInstalledPlugin(pluginId)).unwrap();
 			await loadRemotePlugin({
 				...plugin,
 				pluginId,
 				status: 'ACTIVE',
 				enabled: true,
 			});
-			return {
-				...plugin,
-				pluginId,
-				status: 'ACTIVE',
-				enabled: true,
-			};
+			return plugin;
 		});
 
 	const handleDisable = (pluginId: string) =>
 		runPluginAction('disable', async () => {
-			const plugin = await disablePlugin(pluginId);
+			const plugin = await dispatch(disableInstalledPlugin(pluginId)).unwrap();
 			unloadRemotePlugin(pluginId);
 			return plugin;
 		});
 
 	const handleUninstall = (pluginId: string) => {
 		runPluginAction('uninstall', async () => {
-			await uninstallPlugin(pluginId);
+			await dispatch(uninstallInstalledPlugin(pluginId)).unwrap();
 			unloadRemotePlugin(pluginId);
-			setPlugins((current) => {
-				const remainingPlugins = current.filter(
-					(item) => getPluginId(item) !== pluginId,
-				);
-				setPluginManifests((currentManifests) => {
-					const nextManifests = { ...currentManifests };
-					delete nextManifests[pluginId];
-					return nextManifests;
-				});
-				setSelectedPluginId(
-					remainingPlugins[0] ? getPluginId(remainingPlugins[0]) : undefined,
-				);
-				return remainingPlugins;
+			const remainingPlugins = plugins.filter(
+				(item) => getPluginId(item) !== pluginId,
+			);
+			setPluginManifests((currentManifests) => {
+				const nextManifests = { ...currentManifests };
+				delete nextManifests[pluginId];
+				return nextManifests;
 			});
+			setSelectedPluginId(
+				remainingPlugins[0] ? getPluginId(remainingPlugins[0]) : undefined,
+			);
 			return undefined;
 		});
 	};
@@ -472,7 +480,7 @@ export const Plugins = () => {
 					</div>
 				</div>
 
-				{error && <Alert severity="error">{error}</Alert>}
+				{errorMessage && <Alert severity="error">{errorMessage}</Alert>}
 
 				{isLoading ? (
 					<div className={classes.emptyState}>
