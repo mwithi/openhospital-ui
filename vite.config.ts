@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
 			alias: {
 				'~': path.resolve(__dirname, './src'),
 			},
+			dedupe: ['@emotion/react', '@emotion/styled'],
 		},
 		build: {
 			outDir: 'build',
