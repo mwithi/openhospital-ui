@@ -14,6 +14,19 @@ function getApiProxyConfig(apiBasePath: string) {
 	};
 }
 
+function getDevelopmentCsp(apiTarget: string) {
+	return [
+		"default-src 'self'",
+		"script-src 'self' 'unsafe-inline'",
+		"style-src 'self' 'unsafe-inline'",
+		"img-src 'self' data: blob:",
+		"font-src 'self' data:",
+		`connect-src 'self' ${apiTarget} ws://localhost:5173 http://localhost:8042`,
+		"object-src 'none'",
+		"base-uri 'self'",
+	].join('; ');
+}
+
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd(), '');
 	const apiProxy = getApiProxyConfig(
@@ -31,6 +44,11 @@ export default defineConfig(({ mode }) => {
 			outDir: 'build',
 		},
 		server: {
+			headers: {
+				'Content-Security-Policy-Report-Only': getDevelopmentCsp(
+					apiProxy.target,
+				),
+			},
 			proxy: {
 				[apiProxy.path]: {
 					target: apiProxy.target,
