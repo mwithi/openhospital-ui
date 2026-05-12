@@ -15,6 +15,8 @@ security:
 tags:
 - name: Plugins
   description: Manage Open Hospital plugins
+- name: Plugin Proxy
+  description: Generic reverse-proxy for external plugin integrations
 paths:
   /wards:
     get:
@@ -6533,6 +6535,217 @@ paths:
                 type: boolean
       security:
       - bearerAuth: []
+  /plugins/{pluginId}/proxy/{connectionKey}/**:
+    get:
+      tags:
+      - Plugin Proxy
+      summary: Proxy request to the plugin's external system
+      description: Forwards the request to the URL configured for the plugin by the
+        declared and approved connection key.
+      operationId: proxy
+      parameters:
+      - name: pluginId
+        in: path
+        description: Plugin identifier
+        required: true
+        schema:
+          type: string
+      - name: connectionKey
+        in: path
+        description: Manifest external connection key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Plugin Proxy
+      summary: Proxy request to the plugin's external system
+      description: Forwards the request to the URL configured for the plugin by the
+        declared and approved connection key.
+      operationId: proxy_2
+      parameters:
+      - name: pluginId
+        in: path
+        description: Plugin identifier
+        required: true
+        schema:
+          type: string
+      - name: connectionKey
+        in: path
+        description: Manifest external connection key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Plugin Proxy
+      summary: Proxy request to the plugin's external system
+      description: Forwards the request to the URL configured for the plugin by the
+        declared and approved connection key.
+      operationId: proxy_1
+      parameters:
+      - name: pluginId
+        in: path
+        description: Plugin identifier
+        required: true
+        schema:
+          type: string
+      - name: connectionKey
+        in: path
+        description: Manifest external connection key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Plugin Proxy
+      summary: Proxy request to the plugin's external system
+      description: Forwards the request to the URL configured for the plugin by the
+        declared and approved connection key.
+      operationId: proxy_3
+      parameters:
+      - name: pluginId
+        in: path
+        description: Plugin identifier
+        required: true
+        schema:
+          type: string
+      - name: connectionKey
+        in: path
+        description: Manifest external connection key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
+    options:
+      tags:
+      - Plugin Proxy
+      summary: Proxy request to the plugin's external system
+      description: Forwards the request to the URL configured for the plugin by the
+        declared and approved connection key.
+      operationId: proxy_6
+      parameters:
+      - name: pluginId
+        in: path
+        description: Plugin identifier
+        required: true
+        schema:
+          type: string
+      - name: connectionKey
+        in: path
+        description: Manifest external connection key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
+    head:
+      tags:
+      - Plugin Proxy
+      summary: Proxy request to the plugin's external system
+      description: Forwards the request to the URL configured for the plugin by the
+        declared and approved connection key.
+      operationId: proxy_5
+      parameters:
+      - name: pluginId
+        in: path
+        description: Plugin identifier
+        required: true
+        schema:
+          type: string
+      - name: connectionKey
+        in: path
+        description: Manifest external connection key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
+    patch:
+      tags:
+      - Plugin Proxy
+      summary: Proxy request to the plugin's external system
+      description: Forwards the request to the URL configured for the plugin by the
+        declared and approved connection key.
+      operationId: proxy_4
+      parameters:
+      - name: pluginId
+        in: path
+        description: Plugin identifier
+        required: true
+        schema:
+          type: string
+      - name: connectionKey
+        in: path
+        description: Manifest external connection key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
 components:
   schemas:
     WardDTO:
@@ -6575,13 +6788,13 @@ components:
           format: int32
           description: lock
           example: 0
-        opd:
+        pharmacy:
           type: boolean
         female:
           type: boolean
         male:
           type: boolean
-        pharmacy:
+        opd:
           type: boolean
       required:
       - beds
@@ -7105,10 +7318,21 @@ components:
       required:
       - code
       - description
+    BundleDescriptorDTO:
+      type: object
+      properties:
+        entry:
+          type: string
+        remoteName:
+          type: string
     ExternalConnectionDTO:
       type: object
       description: A declared external network connection
       properties:
+        connectionKey:
+          type: string
+          description: Stable connection key used by the plugin proxy
+          example: orthanc
         host:
           type: string
           description: Target hostname
@@ -7223,6 +7447,42 @@ components:
           type: boolean
           description: Whether any field permission requires explicit admin approval
             due to SENSITIVE sensitivity level
+        uiContribution:
+          $ref: "#/components/schemas/UiContributionDTO"
+          description: "UI contribution declared by the plugin, if any"
+    RouteDescriptorDTO:
+      type: object
+      properties:
+        path:
+          type: string
+        label:
+          type: string
+        menuPath:
+          type: string
+        permission:
+          type: string
+    SlotContributionDTO:
+      type: object
+      properties:
+        slotId:
+          type: string
+        mode:
+          type: string
+        exposedModule:
+          type: string
+    UiContributionDTO:
+      type: object
+      properties:
+        bundle:
+          $ref: "#/components/schemas/BundleDescriptorDTO"
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/SlotContributionDTO"
+        routes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteDescriptorDTO"
     PatientVaccineDTO:
       type: object
       properties:
@@ -7433,11 +7693,11 @@ components:
           type: string
           description: "Flag record deleted, values are 'Y' OR 'N' "
           example: "N"
+        fhu:
+          type: string
         yprog:
           type: integer
           format: int32
-        fhu:
-          type: string
       required:
       - admDate
       - admitted
@@ -8758,6 +9018,9 @@ components:
         installedBy:
           type: string
           description: Username of the administrator who installed the plugin
+        uiContribution:
+          $ref: "#/components/schemas/UiContributionDTO"
+          description: "UI contribution declared by the plugin — bundle entry, slots with exposedModule, routes"
     PageInfoDTO:
       type: object
       properties:
