@@ -204,6 +204,22 @@ const DetailField = ({
 	</div>
 );
 
+const toManifestSnapshot = (plugin: InstalledPlugin): PluginManifest => ({
+	pluginId: getPluginId(plugin),
+	version: plugin.version,
+	name: plugin.name,
+	description: plugin.description,
+	vendor: plugin.vendor,
+	entryPoint: plugin.entryPoint,
+	minCoreVersion: plugin.minCoreVersion,
+	capabilities: plugin.capabilities,
+	permissions: plugin.permissions,
+	fieldPermissions: plugin.fieldPermissions,
+	externalConnections: plugin.externalConnections,
+	requiresExplicitApproval: plugin.requiresExplicitApproval,
+	uiContribution: plugin.uiContribution,
+});
+
 export const Plugins = () => {
 	const dispatch = useAppDispatch();
 	const pluginStore = useAppSelector((state) => state.plugins);
@@ -328,6 +344,7 @@ export const Plugins = () => {
 					[updatedPluginId]:
 						current[updatedPluginId] ??
 						updatedPlugin.manifest ??
+						toManifestSnapshot(updatedPlugin) ??
 						previousManifest ??
 						{},
 				}));
@@ -786,7 +803,10 @@ const PluginDetails = ({
 						<DetailField
 							label="Slots"
 							value={ui.slots
-								?.map((slot) => `${slot.slotId} (${slot.mode ?? 'APPEND'})`)
+								?.map(
+									(slot) =>
+										`${slot.slotId} (${slot.mode}) -> ${slot.exposedModule}`,
+								)
 								.join(', ')}
 						/>
 					</div>

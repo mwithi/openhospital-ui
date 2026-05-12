@@ -15,7 +15,6 @@ const mockPlugins: InstalledPlugin[] = [
 		remoteEntry:
 			'/plugins/org.openhospital.plugin.patientaudit/frontend/remoteEntry.js',
 		globalName: 'patientaudit',
-		exposedModule: './Banner',
 		capabilities: ['EVENT_LISTENER', 'LOG_FILE_WRITE', 'UI_COMPONENT_OVERRIDE'],
 		fieldPermissions: [
 			{
@@ -32,7 +31,13 @@ const mockPlugins: InstalledPlugin[] = [
 				entry: 'frontend/remoteEntry.js',
 				remoteName: 'patientaudit',
 			},
-			slots: [{ slotId: 'header.banner', mode: 'APPEND' }],
+			slots: [
+				{
+					slotId: 'header.banner',
+					mode: 'APPEND',
+					exposedModule: './PatientAuditBanner',
+				},
+			],
 			routes: [],
 		},
 		validationMessages: [],
@@ -78,7 +83,13 @@ const mockPlugins: InstalledPlugin[] = [
 				entry: 'frontend/remoteEntry.js',
 				remoteName: 'radiology',
 			},
-			slots: [{ slotId: 'patient.header.actions', mode: 'APPEND' }],
+			slots: [
+				{
+					slotId: 'patient.header.actions',
+					mode: 'APPEND',
+					exposedModule: './PatientHeaderActions',
+				},
+			],
 			routes: [{ path: '/radiology', label: 'Radiology' }],
 		},
 		validationMessages: [

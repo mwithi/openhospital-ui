@@ -28,8 +28,9 @@ export interface PluginUiContributionDescriptor {
 		requiredPermission?: string;
 	}>;
 	slots?: Array<{
-		slotId?: string;
-		mode?: 'APPEND' | 'PREPEND' | 'REPLACE';
+		slotId: string;
+		mode: 'APPEND' | 'PREPEND' | 'REPLACE';
+		exposedModule: string;
 	}>;
 }
 
@@ -81,7 +82,6 @@ export type InstalledPlugin = Omit<PluginDTO, 'status'> &
 		remoteEntry?: string;
 		remoteEntryUrl?: string;
 		globalName?: string;
-		exposedModule?: string;
 		updatedAt?: string;
 		validationMessages?: string[];
 		permissions?: string[];
