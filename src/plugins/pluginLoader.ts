@@ -233,6 +233,10 @@ const toHeaderBannerContribution = (
 	pluginId: string,
 	moduleExport: unknown,
 ): HeaderBannerContribution | undefined => {
+	const metadata =
+		moduleExport && typeof moduleExport === 'object'
+			? (moduleExport as Partial<HeaderBannerContribution>)
+			: {};
 	const candidate =
 		moduleExport &&
 		typeof moduleExport === 'object' &&
@@ -250,10 +254,14 @@ const toHeaderBannerContribution = (
 	if (candidate && typeof candidate === 'function') {
 		const Component = candidate as React.ComponentType<HeaderBannerRenderProps>;
 		return {
-			id: exposedModule.replace(/^\.\//, '').replace(/\W/g, '-') || slotId,
+			id:
+				metadata.id ??
+				exposedModule.replace(/^\.\//, '').replace(/\W/g, '-') ??
+				slotId,
 			pluginId,
-			severity: 'info',
-			priority: 0,
+			dismissible: metadata.dismissible,
+			severity: metadata.severity ?? 'info',
+			priority: metadata.priority ?? 0,
 			render: (props) => React.createElement(Component, props),
 		};
 	}
@@ -382,9 +390,7 @@ const loadWebpackRemoteModule = async (
 		return runtimePlugin;
 	}
 
-	throw new Error(
-		`Plugin ${pluginId} has no uiContribution.slots declared`,
-	);
+	throw new Error(`Plugin ${pluginId} has no uiContribution.slots declared`);
 };
 
 // ---------------------------------------------------------------------------

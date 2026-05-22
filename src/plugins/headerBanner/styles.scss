@@ -2,13 +2,22 @@
   width: 100%;
   background: #fff;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .headerBannerSlot__primary {
   display: flex;
   align-items: stretch;
   gap: 12px;
-  padding: 8px 30px;
+  padding: 8px 30px 6px;
+}
+
+.headerBannerSlot__item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 
 .headerBannerSlot__content {
@@ -16,14 +25,58 @@
   flex: 1;
 }
 
+.headerBannerSlot__summary {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  color: #333;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .headerBannerSlot__toggle {
   flex: 0 0 auto;
-  min-width: 40px;
-  color: #444;
+  align-self: center;
+  border-color: rgba(0, 0, 0, 0.18);
+  color: #222;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.headerBannerSlot__dismiss {
+  flex: 0 0 auto;
+  align-self: center;
+  color: #555;
+}
+
+.headerBannerSlot__drawer {
+  margin: 0 30px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  background: #f8fafc;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.headerBannerSlot__drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 4px 10px 0;
+  color: #333;
+  font-size: 13px;
+  font-weight: 600;
+  background: #fff;
 }
 
 .headerBannerSlot__list {
   display: grid;
   gap: 8px;
-  padding: 0 30px 8px;
+  padding: 6px 12px 12px;
+}
+
+.headerBannerSlot__drawerItem {
+  min-width: 0;
 }
