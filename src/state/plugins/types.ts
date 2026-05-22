@@ -4,6 +4,7 @@ import type { ApiResponse } from '../types';
 export type IPluginState = {
 	pluginList: ApiResponse<InstalledPlugin[]>;
 	install: ApiResponse<InstalledPlugin>;
+	update: ApiResponse<InstalledPlugin>;
 	approve: ApiResponse<InstalledPlugin>;
 	enable: ApiResponse<InstalledPlugin>;
 	disable: ApiResponse<InstalledPlugin>;

@@ -6,6 +6,7 @@ import {
 	installPlugin,
 	listPlugins,
 	uninstallPlugin,
+	updatePlugin,
 } from '~/components/accessories/admin/plugins/pluginAdminApi';
 
 export const getPlugins = createAsyncThunk(
@@ -18,6 +19,14 @@ export const installPluginZip = createAsyncThunk(
 	'plugins/installPluginZip',
 	async (file: File, thunkApi) =>
 		installPlugin(file).catch((error) =>
+			thunkApi.rejectWithValue(error.response),
+		),
+);
+
+export const updatePluginZip = createAsyncThunk(
+	'plugins/updatePluginZip',
+	async ({ pluginId, file }: { pluginId: string; file: File }, thunkApi) =>
+		updatePlugin(pluginId, file).catch((error) =>
 			thunkApi.rejectWithValue(error.response),
 		),
 );

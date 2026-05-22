@@ -35,6 +35,7 @@ import {
 	installPluginZip,
 	pluginActionsReset,
 	uninstallInstalledPlugin,
+	updatePluginZip,
 } from '~/state/plugins';
 import warningIcon from '../../../../assets/warning-icon.png';
 import classes from './Plugins.module.scss';
@@ -60,12 +61,18 @@ const statusColor: Record<
 	VALIDATING: 'info',
 };
 
-type PluginConfirmationAction = 'approve' | 'enable' | 'disable' | 'uninstall';
+type PluginConfirmationAction =
+	| 'approve'
+	| 'enable'
+	| 'disable'
+	| 'uninstall'
+	| 'update';
 
 interface PendingPluginConfirmation {
 	action: PluginConfirmationAction;
 	pluginId: string;
 	pluginName: string;
+	file?: File;
 }
 
 const confirmationContent: Record<
@@ -99,6 +106,12 @@ const confirmationContent: Record<
 		info: (pluginName) =>
 			`Uninstall "${pluginName}"? This removes it from the plugin registry.`,
 		primaryButtonLabel: 'Uninstall',
+	},
+	update: {
+		title: 'Update plugin',
+		info: (pluginName) =>
+			`"${pluginName}" is already installed. Update it with the selected ZIP?`,
+		primaryButtonLabel: 'Update',
 	},
 };
 
@@ -182,6 +195,101 @@ const getApiErrorMessage = (error: unknown) => {
 	return (error as Error).message;
 };
 
+const findZipEndOfCentralDirectory = (view: DataView) => {
+	const minimumEocdSize = 22;
+	const maximumCommentSize = 0xffff;
+	const lowerBound = Math.max(
+		0,
+		view.byteLength - minimumEocdSize - maximumCommentSize,
+	);
+
+	for (
+		let offset = view.byteLength - minimumEocdSize;
+		offset >= lowerBound;
+		offset--
+	) {
+		if (view.getUint32(offset, true) === 0x06054b50) {
+			return offset;
+		}
+	}
+
+	return undefined;
+};
+
+const inflateZipEntry = async (bytes: Uint8Array) => {
+	const buffer = bytes.buffer.slice(
+		bytes.byteOffset,
+		bytes.byteOffset + bytes.byteLength,
+	) as ArrayBuffer;
+	const stream = new Blob([buffer])
+		.stream()
+		.pipeThrough(new DecompressionStream('deflate-raw'));
+	return new Uint8Array(await new Response(stream).arrayBuffer());
+};
+
+const readZipString = (bytes: Uint8Array, offset: number, length: number) =>
+	new TextDecoder().decode(bytes.subarray(offset, offset + length));
+
+const extractManifestFromZip = async (
+	file: File,
+): Promise<PluginManifest | undefined> => {
+	const buffer = await file.arrayBuffer();
+	const bytes = new Uint8Array(buffer);
+	const view = new DataView(buffer);
+	const eocdOffset = findZipEndOfCentralDirectory(view);
+
+	if (eocdOffset === undefined) {
+		return undefined;
+	}
+
+	let centralDirectoryOffset = view.getUint32(eocdOffset + 16, true);
+	const centralDirectoryEnd =
+		centralDirectoryOffset + view.getUint32(eocdOffset + 12, true);
+
+	while (centralDirectoryOffset < centralDirectoryEnd) {
+		if (view.getUint32(centralDirectoryOffset, true) !== 0x02014b50) {
+			return undefined;
+		}
+
+		const compressionMethod = view.getUint16(centralDirectoryOffset + 10, true);
+		const compressedSize = view.getUint32(centralDirectoryOffset + 20, true);
+		const fileNameLength = view.getUint16(centralDirectoryOffset + 28, true);
+		const extraFieldLength = view.getUint16(centralDirectoryOffset + 30, true);
+		const fileCommentLength = view.getUint16(centralDirectoryOffset + 32, true);
+		const localHeaderOffset = view.getUint32(centralDirectoryOffset + 42, true);
+		const fileName = readZipString(
+			bytes,
+			centralDirectoryOffset + 46,
+			fileNameLength,
+		).replace(/\\/g, '/');
+
+		if (fileName === 'manifest.json' || fileName.endsWith('/manifest.json')) {
+			const localFileNameLength = view.getUint16(localHeaderOffset + 26, true);
+			const localExtraFieldLength = view.getUint16(
+				localHeaderOffset + 28,
+				true,
+			);
+			const dataOffset =
+				localHeaderOffset + 30 + localFileNameLength + localExtraFieldLength;
+			const compressedBytes = bytes.subarray(
+				dataOffset,
+				dataOffset + compressedSize,
+			);
+			const manifestBytes =
+				compressionMethod === 0
+					? compressedBytes
+					: await inflateZipEntry(compressedBytes);
+
+			return JSON.parse(readZipString(manifestBytes, 0, manifestBytes.length));
+		}
+
+		centralDirectoryOffset +=
+			46 + fileNameLength + extraFieldLength + fileCommentLength;
+	}
+
+	return undefined;
+};
+
 const SummaryItem = ({ label, value }: { label: string; value: number }) => (
 	<div className={classes.summaryItem}>
 		<span className={classes.summaryLabel}>{label}</span>
@@ -238,6 +346,7 @@ export const Plugins = () => {
 	const apiError =
 		pluginStore.pluginList.error ??
 		pluginStore.install.error ??
+		pluginStore.update.error ??
 		pluginStore.approve.error ??
 		pluginStore.enable.error ??
 		pluginStore.disable.error ??
@@ -330,6 +439,7 @@ export const Plugins = () => {
 	const runPluginAction = async (
 		label: string,
 		action: () => Promise<InstalledPlugin | undefined>,
+		options?: { replaceManifest?: boolean },
 	) => {
 		setBusyAction(label);
 		setError(undefined);
@@ -341,12 +451,13 @@ export const Plugins = () => {
 				const previousManifest = pluginManifests[updatedPluginId];
 				setPluginManifests((current) => ({
 					...current,
-					[updatedPluginId]:
-						current[updatedPluginId] ??
-						updatedPlugin.manifest ??
-						toManifestSnapshot(updatedPlugin) ??
-						previousManifest ??
-						{},
+					[updatedPluginId]: options?.replaceManifest
+						? (updatedPlugin.manifest ?? toManifestSnapshot(updatedPlugin))
+						: (current[updatedPluginId] ??
+							updatedPlugin.manifest ??
+							toManifestSnapshot(updatedPlugin) ??
+							previousManifest ??
+							{}),
 				}));
 				setSelectedPluginId(updatedPluginId);
 			} else {
@@ -367,10 +478,51 @@ export const Plugins = () => {
 			return;
 		}
 
+		let manifest: PluginManifest | undefined;
+		try {
+			manifest = await extractManifestFromZip(file);
+		} catch (manifestError) {
+			console.warn('Could not inspect plugin ZIP manifest', manifestError);
+		}
+
+		const existingPlugin = manifest?.pluginId
+			? plugins.find((plugin) => getPluginId(plugin) === manifest.pluginId)
+			: undefined;
+
+		if (existingPlugin) {
+			setPendingConfirmation({
+				action: 'update',
+				file,
+				pluginId: getPluginId(existingPlugin),
+				pluginName: getPluginName(existingPlugin),
+			});
+			return;
+		}
+
 		await runPluginAction('install', () =>
 			dispatch(installPluginZip(file)).unwrap(),
 		);
 	};
+
+	const handleUpdate = (pluginId: string, file: File) =>
+		runPluginAction(
+			'update',
+			async () => {
+				unloadRemotePlugin(pluginId);
+				const plugin = await dispatch(
+					updatePluginZip({ pluginId, file }),
+				).unwrap();
+				if (plugin.enabled || statusLabel(plugin) === 'ACTIVE') {
+					await loadRemotePlugin({
+						...plugin,
+						pluginId,
+						status: 'ACTIVE',
+					});
+				}
+				return plugin;
+			},
+			{ replaceManifest: true },
+		);
 
 	const requestPluginAction = (
 		action: PluginConfirmationAction,
@@ -438,7 +590,7 @@ export const Plugins = () => {
 			return;
 		}
 
-		const { action, pluginId } = pendingConfirmation;
+		const { action, file, pluginId } = pendingConfirmation;
 		setPendingConfirmation(undefined);
 
 		switch (action) {
@@ -453,6 +605,11 @@ export const Plugins = () => {
 				break;
 			case 'uninstall':
 				handleUninstall(pluginId);
+				break;
+			case 'update':
+				if (file) {
+					handleUpdate(pluginId, file);
+				}
 				break;
 		}
 	};

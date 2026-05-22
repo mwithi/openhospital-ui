@@ -15,6 +15,9 @@ export const pluginSlice = createSlice({
 		installPluginReset: (state) => {
 			state.install = initial.install;
 		},
+		updatePluginReset: (state) => {
+			state.update = initial.update;
+		},
 		approvePluginReset: (state) => {
 			state.approve = initial.approve;
 		},
@@ -29,6 +32,7 @@ export const pluginSlice = createSlice({
 		},
 		pluginActionsReset: (state) => {
 			state.install = initial.install;
+			state.update = initial.update;
 			state.approve = initial.approve;
 			state.enable = initial.enable;
 			state.disable = initial.disable;
@@ -62,6 +66,18 @@ export const pluginSlice = createSlice({
 			})
 			.addCase(thunks.installPluginZip.rejected, (state, action) => {
 				state.install = ApiResponse.error(action.payload);
+			})
+			.addCase(thunks.updatePluginZip.pending, (state) => {
+				state.update = ApiResponse.loading();
+			})
+			.addCase(thunks.updatePluginZip.fulfilled, (state, action) => {
+				state.update = ApiResponse.value(action.payload);
+				state.pluginList = ApiResponse.value(
+					upsertPlugin(state.pluginList.data ?? [], action.payload),
+				);
+			})
+			.addCase(thunks.updatePluginZip.rejected, (state, action) => {
+				state.update = ApiResponse.error(action.payload);
 			})
 			.addCase(thunks.approveInstalledPlugin.pending, (state) => {
 				state.approve = ApiResponse.loading();
@@ -129,6 +145,7 @@ const upsertPlugin = (
 
 export const {
 	installPluginReset,
+	updatePluginReset,
 	approvePluginReset,
 	enablePluginReset,
 	disablePluginReset,
