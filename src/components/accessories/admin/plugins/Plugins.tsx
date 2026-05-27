@@ -328,6 +328,43 @@ const toManifestSnapshot = (plugin: InstalledPlugin): PluginManifest => ({
 	uiContribution: plugin.uiContribution,
 });
 
+const sensitivityColors: Record<
+	string,
+	{ backgroundColor: string; color: string }
+> = {
+	ADMINISTRATIVE: { backgroundColor: '#2f855a', color: '#ffffff' },
+	CLINICAL: { backgroundColor: '#7b61ff', color: '#ffffff' },
+	PERSONAL: { backgroundColor: '#2f80ed', color: '#ffffff' },
+	SENSIBLE: { backgroundColor: '#d64545', color: '#ffffff' },
+	SENSITIVE: { backgroundColor: '#d64545', color: '#ffffff' },
+};
+
+const getSensitivityColors = (sensitivity?: string) => {
+	const key = sensitivity?.toUpperCase() ?? '';
+	return (
+		sensitivityColors[key] ?? {
+			backgroundColor: '#6b7280',
+			color: '#ffffff',
+		}
+	);
+};
+
+const SensitivityChip = ({ sensitivity }: { sensitivity?: string }) =>
+	sensitivity ? (
+		<Chip
+			size="small"
+			label={sensitivity}
+			sx={{
+				...getSensitivityColors(sensitivity),
+				fontWeight: 700,
+				'& .MuiChip-label': { color: 'inherit' },
+			}}
+		/>
+	) : null;
+
+const shouldLoadPluginRuntime = () =>
+	import.meta.env.VITE_USE_MOCK_API !== 'true';
+
 export const Plugins = () => {
 	const dispatch = useAppDispatch();
 	const pluginStore = useAppSelector((state) => state.plugins);
@@ -376,8 +413,9 @@ export const Plugins = () => {
 			total: plugins.length,
 			active: plugins.filter((plugin) => statusLabel(plugin) === 'ACTIVE')
 				.length,
-			pending: plugins.filter((plugin) => statusLabel(plugin) === 'VALIDATING')
-				.length,
+			pending: plugins.filter((plugin) =>
+				['PENDING_APPROVAL', 'VALIDATING'].includes(statusLabel(plugin)),
+			).length,
 			failed: plugins.filter((plugin) => statusLabel(plugin) === 'FAILED')
 				.length,
 		}),
@@ -389,6 +427,15 @@ export const Plugins = () => {
 		dispatch(pluginActionsReset());
 		try {
 			const loadedPlugins = await dispatch(getPlugins()).unwrap();
+			setPluginManifests((current) => ({
+				...Object.fromEntries(
+					loadedPlugins.map((plugin) => [
+						getPluginId(plugin),
+						plugin.manifest ?? toManifestSnapshot(plugin),
+					]),
+				),
+				...current,
+			}));
 			setSelectedPluginId(
 				(current) =>
 					current ??
@@ -405,6 +452,19 @@ export const Plugins = () => {
 
 	useEffect(() => {
 		if (!selectedPluginId || pluginManifests[selectedPluginId]) {
+			return;
+		}
+
+		const pluginSnapshot = plugins.find(
+			(plugin) => getPluginId(plugin) === selectedPluginId,
+		);
+
+		if (pluginSnapshot) {
+			setPluginManifests((current) => ({
+				...current,
+				[selectedPluginId]:
+					pluginSnapshot.manifest ?? toManifestSnapshot(pluginSnapshot),
+			}));
 			return;
 		}
 
@@ -434,7 +494,7 @@ export const Plugins = () => {
 		return () => {
 			isMounted = false;
 		};
-	}, [pluginManifests, selectedPluginId]);
+	}, [pluginManifests, plugins, selectedPluginId]);
 
 	const runPluginAction = async (
 		label: string,
@@ -512,7 +572,10 @@ export const Plugins = () => {
 				const plugin = await dispatch(
 					updatePluginZip({ pluginId, file }),
 				).unwrap();
-				if (plugin.enabled || statusLabel(plugin) === 'ACTIVE') {
+				if (
+					shouldLoadPluginRuntime() &&
+					(plugin.enabled || statusLabel(plugin) === 'ACTIVE')
+				) {
 					await loadRemotePlugin({
 						...plugin,
 						pluginId,
@@ -538,24 +601,28 @@ export const Plugins = () => {
 	const handleApprove = (pluginId: string) =>
 		runPluginAction('approve', async () => {
 			const plugin = await dispatch(approveInstalledPlugin(pluginId)).unwrap();
-			await loadRemotePlugin({
-				...plugin,
-				pluginId,
-				status: 'ACTIVE',
-				enabled: true,
-			});
+			if (shouldLoadPluginRuntime()) {
+				await loadRemotePlugin({
+					...plugin,
+					pluginId,
+					status: 'ACTIVE',
+					enabled: true,
+				});
+			}
 			return plugin;
 		});
 
 	const handleEnable = (pluginId: string) =>
 		runPluginAction('enable', async () => {
 			const plugin = await dispatch(enableInstalledPlugin(pluginId)).unwrap();
-			await loadRemotePlugin({
-				...plugin,
-				pluginId,
-				status: 'ACTIVE',
-				enabled: true,
-			});
+			if (shouldLoadPluginRuntime()) {
+				await loadRemotePlugin({
+					...plugin,
+					pluginId,
+					status: 'ACTIVE',
+					enabled: true,
+				});
+			}
 			return plugin;
 		});
 
@@ -770,7 +837,7 @@ const PluginDetails = ({
 					</p>
 				</div>
 				<div className={classes.actions}>
-					{status === 'VALIDATING' && (
+					{['PENDING_APPROVAL', 'VALIDATING'].includes(status) && (
 						<Button
 							variant="contained"
 							color="success"
@@ -902,15 +969,11 @@ const PluginDetails = ({
 									{(permission.fields ?? []).map((field) => (
 										<Chip key={field} size="small" label={field} />
 									))}
-									{(permission.maxSensitivity ?? permission.sensitivity) && (
-										<Chip
-											size="small"
-											color="warning"
-											label={
-												permission.maxSensitivity ?? permission.sensitivity
-											}
-										/>
-									)}
+									<SensitivityChip
+										sensitivity={
+											permission.maxSensitivity ?? permission.sensitivity
+										}
+									/>
 								</div>
 							</div>
 						))}
